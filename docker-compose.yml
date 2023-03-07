@@ -1,0 +1,85 @@
+version: '3.3'
+services:
+  eureka:
+    image: eureka
+    build: eureka-server/
+    ports:
+      - "8761:8761"
+  gateway:
+    image: gateway
+    build: gateway-service/
+    ports:
+      - "9996:9996"
+    environment:
+      EUREKASERVER_URI: "http://eureka:8761/eureka/"
+      EUREKASERVER_PORT: "8761"
+
+  user:
+    image: user
+    build: bankly-user/
+    ports:
+      - "9997:9997"
+    depends_on:
+      - eureka
+      - postgesqldb
+
+
+  postgesqldb:
+    image: postgres:latest
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_PASSWORD=root
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=bankly
+
+
+  transaction:
+    image: transaction
+    build: bankly-transaction/
+    ports:
+      - "9999:9999"
+    depends_on:
+      - eureka
+      - mongodb
+
+
+  mongodb:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_DB=transaction
+
+
+  wallet:
+    image: wallet
+    build: bankly-wallet/
+    ports:
+      - "9998:9998"
+    depends_on:
+      - eureka
+      - mysqldb
+
+
+  mysqldb:
+    image: mysql:8.0.30
+    volumes:
+      - ./config/mysql:/etc/mysql/conf.d
+    environment:
+      - MYSQL_ALLOW_EMPTY_PASSWORD=yes
+      - MYSQL_DATABASE=wallet
+      - MYSQL_USER=admin
+      - MYSQL_PASSWORD=admin
+      - MYSQL_ROOT_PASSWORD=
+    ports:
+      - 127.0.0.1:3306:3306
+    command: mysqld --lower_case_table_names=1 --skip-ssl --character_set_server=utf8mb4 --explicit_defaults_for_timestamp
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost", "-uadmin", "-padmin"] # Command to check health.
+      interval: 5s # Interval between health checks.
+      timeout: 5s # Timeout for each health checking.
+      retries: 20 # Hou many times retries.
+
+networks:
+  employee-mysql:
